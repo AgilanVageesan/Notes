@@ -67,10 +67,68 @@ class Program
 }
 ```
 
-Make sure you adjust the script file path (`".\\PrintInputs.ps1"`) and the provided input values accordingly. 
 
-**Step 3: Build and Run the C# Program**
+```csharp
+using System;
+using System.Diagnostics;
 
-Build and run your C# program, and it will call the PowerShell script and display the inputs you provided.
+public class PowerShellCaller
+{
+    public void RunPowerShellScript(string name, string age, string location)
+    {
+        string scriptPath = "C:\\path\\to\\your\\script.ps1"; // Replace with the actual path to your script
+        string arguments = $"-ExecutionPolicy Bypass -NoProfile -File \"{scriptPath}\" \"{name}\" \"{age}\" \"{location}\"";
+
+        ProcessStartInfo psi = new ProcessStartInfo()
+        {
+            FileName = "powershell.exe",
+            Arguments = arguments,
+            RedirectStandardOutput = true,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardError = true,  // Redirect the error output
+            RedirectStandardInput = true    // Redirect the standard input
+        };
+
+        using (Process process = new Process())
+        {
+            process.StartInfo = psi;
+            process.OutputDataReceived += (sender, e) =>
+            {
+                if (!string.IsNullOrEmpty(e.Data))
+                {
+                    Console.WriteLine(e.Data);
+                }
+            };
+
+            process.ErrorDataReceived += (sender, e) =>
+            {
+                if (!string.IsNullOrEmpty(e.Data))
+                {
+                    Console.WriteLine(e.Data);
+                }
+            };
+
+            process.Start();
+            process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
+
+            // Optionally, you can write input to the PowerShell script
+            process.StandardInput.WriteLine("Input data for PowerShell script");
+
+            process.WaitForExit();
+        }
+    }
+
+    public static void Main(string[] args)
+    {
+        PowerShellCaller caller = new PowerShellCaller();
+        caller.RunPowerShellScript("John Doe", "30", "New York");
+    }
+}
+```
+
+
+
 
 Remember to compile and run the C# program within an environment where PowerShell scripting is allowed (e.g., Windows). This example demonstrates how to call a PowerShell script from C# and pass parameters, which can be useful in various automation and integration scenarios.
