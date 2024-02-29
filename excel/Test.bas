@@ -24,6 +24,9 @@ Sub CopyModelAndSerial()
             ' Find the last row in the jam sheet
             lastRowJam = jamSheet.Cells(jamSheet.Rows.Count, "A").End(xlUp).Row
             
+            ' Find the column index of "Email Address" in the jam sheet
+            emailIndexJam = Application.Match("Email Address", jamSheet.Rows(1), 0)
+            
             ' Find the column index of "Model" in the jam sheet
             modelIndexJam = Application.Match("Model", jamSheet.Rows(1), 0)
             
