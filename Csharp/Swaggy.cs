@@ -1,14 +1,10 @@
 using System;
 using System.IO;
-using Microsoft.OpenApi.Models;
-using Swashbuckle.AspNetCore.SwaggerGen;
-using Swashbuckle.AspNetCore.Swagger;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.Extensions.DependencyInjection;
 using System.Reflection;
 using System.Linq;
-using Microsoft.Extensions.Options;
-using System.Collections.Generic;
+using Microsoft.OpenApi.Models;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
 namespace OpenApiGenerator
@@ -46,9 +42,8 @@ namespace OpenApiGenerator
             var startupAssembly = Assembly.LoadFrom(Path.Combine(projectPath, "bin", "Debug", $"{Path.GetFileNameWithoutExtension(projectPath)}.dll"));
 
             var services = new ServiceCollection();
-            var applicationLifetime = new ApplicationLifetime();
-            services.AddSingleton<IHostApplicationLifetime>(applicationLifetime);
-            services.AddMvcCore().AddApiExplorer();
+            services.AddControllers();
+            services.AddEndpointsApiExplorer();
             services.AddSwaggerGen(c =>
             {
                 c.SwaggerDoc("v1", new OpenApiInfo { Title = "API", Version = "v1" });
@@ -60,12 +55,8 @@ namespace OpenApiGenerator
 
             var serviceProvider = services.BuildServiceProvider();
 
-            var generatorOptions = serviceProvider.GetRequiredService<IOptions<SwaggerGenOptions>>().Value;
-            generatorOptions.OperationFilter<RemoveVersionFromParameter>();
-            generatorOptions.DocumentFilter<ReplaceVersionWithExactValueInPath>();
-
             var generator = serviceProvider.GetRequiredService<ISwaggerProvider>();
-            var document = generator.GetSwagger("v1");
+            var document = generator.GetSwagger("v1", null, null, "/");
 
             var filePath = Path.Combine(outputPath, "openapi.yaml");
 
@@ -75,31 +66,6 @@ namespace OpenApiGenerator
             }
 
             Console.WriteLine($"OpenAPI spec file generated at: {filePath}");
-        }
-    }
-
-    public class RemoveVersionFromParameter : IOperationFilter
-    {
-        public void Apply(OpenApiOperation operation, OperationFilterContext context)
-        {
-            var versionParameter = operation.Parameters.Single(p => p.Name == "version");
-            operation.Parameters.Remove(versionParameter);
-        }
-    }
-
-    public class ReplaceVersionWithExactValueInPath : IDocumentFilter
-    {
-        public void Apply(OpenApiDocument swaggerDoc, DocumentFilterContext context)
-        {
-            foreach (var path in swaggerDoc.Paths)
-            {
-                var updatedPath = path.Key.Replace("v{version}", "v1");
-                swaggerDoc.Paths[updatedPath] = path.Value;
-                if (updatedPath != path.Key)
-                {
-                    swaggerDoc.Paths.Remove(path.Key);
-                }
-            }
         }
     }
 }
