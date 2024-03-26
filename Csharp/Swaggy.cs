@@ -1,7 +1,7 @@
 using System;
 using System.IO;
-using System.Reflection;
 using System.Linq;
+using System.Reflection;
 using Microsoft.OpenApi.Models;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,14 +14,17 @@ namespace OpenApiGenerator
     {
         static void Main(string[] args)
         {
-            if (args.Length != 2)
+            Console.WriteLine("Enter the path to the .NET Framework project or solution:");
+            string projectPath = Console.ReadLine();
+
+            Console.WriteLine("Enter the output path for the OpenAPI specification:");
+            string outputPath = Console.ReadLine();
+
+            if (string.IsNullOrWhiteSpace(projectPath) || string.IsNullOrWhiteSpace(outputPath))
             {
-                Console.WriteLine("Usage: dotnet run <project-path> <output-path>");
+                Console.WriteLine("Invalid input. Both project path and output path are required.");
                 return;
             }
-
-            string projectPath = args[0];
-            string outputPath = args[1];
 
             if (!Directory.Exists(projectPath))
             {
@@ -40,7 +43,34 @@ namespace OpenApiGenerator
 
         static void GenerateOpenApiSpec(string projectPath, string outputPath)
         {
-            var startupAssembly = Assembly.LoadFrom(Path.Combine(projectPath, "bin", "Debug", $"{Path.GetFileNameWithoutExtension(projectPath)}.dll"));
+            string assemblyPath;
+            
+            // Check if the given path is a solution file
+            if (Path.GetExtension(projectPath).Equals(".sln", StringComparison.OrdinalIgnoreCase))
+            {
+                var solutionParser = new Microsoft.Build.Locator.MSBuildLocator();
+                solutionParser.RegisterDefaults();
+                var solution = Microsoft.Build.Locator.MSBuildWorkspace.Create().OpenSolutionAsync(projectPath).Result;
+                var project = solution.Projects.FirstOrDefault();
+                if (project == null)
+                {
+                    Console.WriteLine("No projects found in the solution.");
+                    return;
+                }
+                assemblyPath = project.OutputFilePath;
+            }
+            // Check if the given path is a DLL
+            else if (Path.GetExtension(projectPath).Equals(".dll", StringComparison.OrdinalIgnoreCase))
+            {
+                assemblyPath = projectPath;
+            }
+            else
+            {
+                Console.WriteLine("Invalid project path. Please provide a path to a solution file (.sln) or a DLL.");
+                return;
+            }
+
+            var startupAssembly = Assembly.LoadFrom(assemblyPath);
 
             var services = new ServiceCollection();
             services.AddControllers();
@@ -61,13 +91,10 @@ namespace OpenApiGenerator
 
             var filePath = Path.Combine(outputPath, "openapi.yaml");
 
-            using (var writer = new StringWriter())
+            using (var writer = new StreamWriter(filePath))
             {
                 var serializer = new SerializerBuilder().Build();
                 serializer.Serialize(writer, document);
-                var yaml = writer.ToString();
-
-                File.WriteAllText(filePath, yaml);
             }
 
             Console.WriteLine($"OpenAPI spec file generated at: {filePath}");
