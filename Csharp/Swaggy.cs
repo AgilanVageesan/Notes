@@ -6,8 +6,6 @@ using Microsoft.OpenApi.Models;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Options;
 using YamlDotNet.Serialization;
 
 namespace OpenApiGenerator
@@ -58,53 +56,21 @@ namespace OpenApiGenerator
 
             var serviceProvider = services.BuildServiceProvider();
 
-            var generatorOptions = serviceProvider.GetRequiredService<IOptions<SwaggerGenOptions>>().Value;
-            generatorOptions.OperationFilter<RemoveVersionFromParameter>();
-            generatorOptions.DocumentFilter<ReplaceVersionWithExactValueInPath>();
-
-            var app = new ApplicationBuilder(serviceProvider);
-            app.UseEndpoints(endpoints =>
-            {
-                endpoints.MapControllers();
-            });
-
-            var document = generatorOptions.GenerateAsync("v1", app.Services).Result;
+            var generator = serviceProvider.GetRequiredService<ISwaggerProvider>();
+            var document = generator.GetSwagger("v1", null, null, "/");
 
             var filePath = Path.Combine(outputPath, "openapi.yaml");
 
-            using (var writer = new StreamWriter(filePath))
+            using (var writer = new StringWriter())
             {
                 var serializer = new SerializerBuilder().Build();
                 serializer.Serialize(writer, document);
+                var yaml = writer.ToString();
+
+                File.WriteAllText(filePath, yaml);
             }
 
             Console.WriteLine($"OpenAPI spec file generated at: {filePath}");
-        }
-    }
-
-    public class RemoveVersionFromParameter : IOperationFilter
-    {
-        public void Apply(OpenApiOperation operation, OperationFilterContext context)
-        {
-            var versionParameter = operation.Parameters.SingleOrDefault(p => p.Name == "version");
-            if (versionParameter != null)
-                operation.Parameters.Remove(versionParameter);
-        }
-    }
-
-    public class ReplaceVersionWithExactValueInPath : IDocumentFilter
-    {
-        public void Apply(OpenApiDocument swaggerDoc, DocumentFilterContext context)
-        {
-            foreach (var (path, pathItem) in swaggerDoc.Paths.ToList())
-            {
-                var updatedPath = path.Replace("{version}", "v1");
-                if (updatedPath != path)
-                {
-                    swaggerDoc.Paths.Remove(path);
-                    swaggerDoc.Paths.Add(updatedPath, pathItem);
-                }
-            }
         }
     }
 }
